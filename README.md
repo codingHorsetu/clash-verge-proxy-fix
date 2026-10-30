@@ -92,6 +92,33 @@ powershell -ExecutionPolicy Bypass -File .\src\proxy-residue-fix.ps1 -Action Sto
 
 ---
 
+## 可选：开机自动处理（默认不安装）
+
+**默认情况下本工具不做任何开机行为、不常驻后台。** 如果你遇到的是「每次开机后、客户端还没起来的几十秒里，所有应用都连不上」，可以把下面这个可选组件装上。
+
+启用后，每次登录 Windows 会执行一次（最长等 90 秒，然后退出）：
+
+1. 系统代理开着、但指向的本机端口无响应 → **立即关闭**（消除上次关机残留）
+2. 等待客户端端口就绪（客户端没运行时会尝试拉起）
+3. 端口就绪后，读取客户端配置里的 `enable_system_proxy` 决定是否重新开启 —— **你在 Clash 里手动关了，它就不会强开**
+
+| 操作 | 方法 |
+|---|---|
+| **启用** | 双击 `autostart-install.bat`，或 `menu.bat` 选 `6` |
+| **查看状态** | `menu.bat` 选 `8`，或 `boot-agent.ps1 -Action Status` |
+| **关闭** | 双击 `autostart-uninstall.bat`，或 `menu.bat` 选 `7` |
+| **完全不用** | 什么都不做 —— 默认就是关的，删掉这几个文件也不影响主功能 |
+
+设计上的几个取舍：
+
+- **不需要管理员权限**：只是往当前用户的「启动」文件夹写一个 `.vbs`，不碰系统服务、不注册计划任务。
+- **卸载不留残余**：删掉那个 `.vbs`，并结束可能在运行的进程，仅此而已。
+- **失败即直连**：等不到端口就保持系统代理关闭，宁可直连也不留死代理。
+- **日志**：`%LOCALAPPDATA%\ClashProxyAutostart\boot.log`（超过 512 KB 自动裁剪）
+- **它也会检查环境变量**：发现 `HTTP_PROXY` 之类的残留会写警告 —— 这些变量由你自己决定是否清理，它不会擅自删除。
+
+---
+
 ## 它到底改了什么
 
 修复（`Fix` / `Direct`）只做这几件事，全部可逆：
@@ -172,11 +199,22 @@ Windows 上"代理"并不是一个开关，而是**五条互不相干的通道**
 
 ```
 quick-fix.bat                 一键修复（先诊断再修复）
-menu.bat                      菜单
-src/proxy-residue-fix.ps1     主脚本
+menu.bat                      菜单（诊断/修复/直连/重启/退出 + 自启动管理）
+autostart-install.bat         启用开机自动处理（可选）
+autostart-uninstall.bat       关闭开机自动处理
+src/proxy-residue-fix.ps1     主脚本：诊断 / 修复 / 直连 / 重启 / 退出
+src/boot-agent.ps1            登录自启动脚本（可选组件，不装则不运行）
 tools/with-proxy.bat          只给单个命令加代理
 docs/diagnosis.md             深入排查手册（手工命令、hosts、节点问题）
 ```
+
+---
+
+## 相关项目
+
+- [freytesla/clash-verge-proxy-autostart](https://github.com/freytesla/clash-verge-proxy-autostart) —— 登录时自动开关系统代理。
+  本项目的可选自启动组件参考了它的「先清空 → 等端口 → 再开启」三段式思路，并补上了它未覆盖的一环：
+  残留的 `HTTP_PROXY` / `HTTPS_PROXY` 环境变量（正是「网页能开、其它应用全断」的元凶）。
 
 ---
 

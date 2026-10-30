@@ -152,3 +152,23 @@ ipconfig /flushdns
 | 代理开着、应用超时 | 节点/订阅 | 看客户端日志 | 换节点 |
 | 游戏登录报网络错误 | 启动器读 env | 清变量后重开启动器 | 复测 |
 | 域名解析到 127.0.0.1 | hosts 被改 | 查 hosts | 备份后清理 |
+
+---
+
+## 8. 开机后的那几十秒
+
+关机时客户端进程被系统直接结束，来不及执行"重置系统代理"。于是下次开机后、客户端启动前，系统代理仍然指向 `127.0.0.1:7897` —— 这段时间里所有读系统代理的程序都会连不上。
+
+判断方法（客户端还没起来时）：
+
+```powershell
+Get-ItemProperty 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings' | Select ProxyEnable,ProxyServer
+Test-NetConnection 127.0.0.1 -Port 7897 -InformationLevel Quiet
+```
+
+`ProxyEnable=1` + 端口探测 False + 客户端没在跑 = 就是这个问题。
+
+两种处理方式，任选其一：
+
+- **手动**：开机后双击 `quick-fix.bat`
+- **自动**：启用可选组件（README「可选：开机自动处理」）。登录时先清空系统代理，等端口就绪后再按客户端内部开关决定是否开启；等不到就保持直连，绝不留下死代理。
